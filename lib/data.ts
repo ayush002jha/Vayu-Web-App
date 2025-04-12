@@ -1,0 +1,58 @@
+export const products = [
+  {
+    id: 1,
+    name: "Fresh Salad Bowl",
+    price: 299,
+    image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop",
+    description: "Fresh mixed greens with seasonal vegetables and vinaigrette.",
+  },
+  {
+    id: 2,
+    name: "Chicken Sandwich",
+    price: 399,
+    image: "https://images.unsplash.com/photo-1528735602780-2552fd46c7af?w=200&h=200&fit=crop",
+    description: "Grilled chicken with lettuce, tomato, and special sauce.",
+  },
+  {
+    id: 3,
+    name: "Fruit Smoothie",
+    price: 199,
+    image: "https://images.unsplash.com/photo-1589733955941-5eeaf752f6dd?q=80&w=1742&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+    description: "Blend of seasonal fruits with yogurt and honey.",
+  },
+  {
+    id: 4,
+    name: "Veggie Wrap",
+    price: 249,
+    image: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=200&h=200&fit=crop",
+    description: "Assorted vegetables with hummus in a whole grain wrap.",
+  },
+  {
+    id: 5,
+    name: "Coffee",
+    price: 149,
+    image: "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=200&h=200&fit=crop",
+    description: "Freshly brewed premium coffee.",
+  },
+  {
+    id: 6,
+    name: "Chocolate Muffin",
+    price: 99,
+    image: "https://images.unsplash.com/photo-1550617931-e17a7b70dce2?w=200&h=200&fit=crop",
+    description: "Rich chocolate muffin with chocolate chips.",
+  },
+  {
+    id: 7,
+    name: "Protein Bowl",
+    price: 449,
+    image: "https://images.unsplash.com/photo-1546069901-d5bfd2cbfb1f?w=200&h=200&fit=crop",
+    description: "Quinoa, grilled chicken, avocado, and mixed vegetables.",
+  },
+  {
+    id: 8,
+    name: "Iced Tea",
+    price: 99,
+    image: "https://images.unsplash.com/photo-1551024709-8f681bc7d1e3?w=200&h=200&fit=crop",
+    description: "Refreshing iced tea with lemon.",
+  },
+]
