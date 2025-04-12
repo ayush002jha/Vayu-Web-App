@@ -1,5 +1,6 @@
 import { Home, Menu } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import Image from "next/image"
 
 export function NavBar() {
   return (
@@ -8,7 +9,10 @@ export function NavBar() {
         <Button variant="ghost" size="icon">
           <Menu className="h-5 w-5" />
         </Button>
+        <div className="flex items-center gap-2">
+<Image src="/VAYU.png" alt="VayuDelivery" width={32} height={32} />
         <h1 className="font-bold text-lg">VayuDelivery</h1>
+        </div>
         <Button variant="ghost" size="icon">
           <Home className="h-5 w-5" />
         </Button>
