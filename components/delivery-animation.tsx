@@ -138,24 +138,66 @@ export function DeliveryAnimation(): React.ReactElement {
   const [deliveryPathPoints, setDeliveryPathPoints] = useState<L.LatLngExpression[] | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // --- Effect to Get Location ---
+  // --- Effect to Get Location (MODIFIED: Using Geolocation API) ---
   useEffect(() => {
+    // --- Using Geolocation API ---
+    if (!navigator.geolocation) {
+      console.error("Geolocation is not supported by this browser.");
+      setLocationError("Geolocation is not supported by your browser.");
+      setIsLocating(false);
+      setStatusText("Geolocation Error");
+      return; // Exit if not supported
+    }
+
+    console.log(">>> Effect: Attempting to fetch user location...");
+    // isLocating is already true, statusText set initially
+
+    const successCallback = (position: GeolocationPosition) => { // Add explicit type
+      const { latitude, longitude } = position.coords;
+      console.log(`>>> User location fetched successfully: Lat: ${latitude}, Lng: ${longitude}`);
+      setCurrentUserLocation(L.latLng(latitude, longitude)); // Create LatLng object
+      setIsLocating(false); // Location found
+      setLocationError(null); // Clear any previous error
+      setStatusText("Calculating route..."); // Update status
+    };
+
+    const errorCallback = (error: GeolocationPositionError) => { // Add explicit type
+      console.error("!!! Error getting user location:", error.message, `(Code: ${error.code})`);
+      let message = "Could not fetch your location.";
+      // Provide more specific error messages based on the error code
+      if (error.code === error.PERMISSION_DENIED) {
+        message = "Location access denied. Please enable location permissions for this site.";
+      } else if (error.code === error.POSITION_UNAVAILABLE) {
+        message = "Location information is unavailable.";
+      } else if (error.code === error.TIMEOUT) {
+        message = "The request to get user location timed out.";
+      }
+      setLocationError(message);
+      setIsLocating(false); // Finished locating (even though it failed)
+      setStatusText("Location Error"); // Update status
+    };
+
+    // Options for the geolocation request
+    const options: PositionOptions = {
+      enableHighAccuracy: true, // Request more accurate position (may use more battery)
+      timeout: 10000,         // Maximum time (in milliseconds) to wait for a position (10 seconds)
+      maximumAge: 0           // Don't use a cached position, get a fresh one
+    };
+
+    // Make the request
+    navigator.geolocation.getCurrentPosition(successCallback, errorCallback, options);
+
+    // --- Hardcoded Location (Keep commented out for reference/testing) ---
+    /*
     console.log(">>> Effect: Setting hardcoded user location for testing.");
     const userLatLng = L.latLng(USER_COORDS_FOR_TESTING[0], USER_COORDS_FOR_TESTING[1]);
     setCurrentUserLocation(userLatLng);
     setIsLocating(false);
     setLocationError(null);
     setStatusText("Calculating route...");
-    // --- Geolocation Code (Optional) ---
-    /*
-    if (!navigator.geolocation) { ... }
-    navigator.geolocation.getCurrentPosition(
-        (position: GeolocationPosition) => { ... }, // Explicit type
-        (error: GeolocationPositionError) => { ... }, // Explicit type
-        { ... }
-    );
     */
-  }, []);
+
+  }, []); // Runs only once on component mount to fetch location
 
   // --- Effect to Calculate Path ---
   useEffect(() => {
