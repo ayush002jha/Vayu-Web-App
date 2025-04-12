@@ -43,7 +43,7 @@ export function ShoppingCart({ items, onIncrement, onDecrement }: ShoppingCartPr
     // Simulate delivery completion after 10 seconds
     setTimeout(() => {
       setCheckoutStep("completed")
-    }, 100000)
+    }, 30000)
   }
 
   const handleNewOrder = () => {
