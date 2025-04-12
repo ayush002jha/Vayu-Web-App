@@ -5,8 +5,18 @@ import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Minus, Plus, Trash2 } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
-import { DeliveryAnimation } from "@/components/delivery-animation"
-
+// import { DeliveryAnimation } from "@/components/delivery-animation"
+import dynamic from 'next/dynamic';
+import { Suspense } from 'react'; // Optional but good for loading states
+// With a dynamic import:
+const DynamicDeliveryAnimation = dynamic(
+  () => import('@/components/delivery-animation') // Adjust path to your component
+    .then((mod) => mod.DeliveryAnimation), // Make sure to access the named export
+  {
+    ssr: false, // <--- This is the crucial part! Disables server-side rendering for this component
+    loading: () => <div className="flex justify-center items-center h-96"><p>Loading map...</p></div> // Optional: Show a loading message
+  }
+);
 interface CartItem {
   id: number
   name: string
@@ -41,7 +51,9 @@ export function ShoppingCart({ items, onIncrement, onDecrement }: ShoppingCartPr
   }
 
   if (checkoutStep === "delivery") {
-    return <DeliveryAnimation />
+    return (<Suspense fallback={<p>Loading map...</p>}>
+      <DynamicDeliveryAnimation />
+    </Suspense>)
   }
 
   if (checkoutStep === "completed") {
@@ -85,19 +97,19 @@ export function ShoppingCart({ items, onIncrement, onDecrement }: ShoppingCartPr
                   <p className="text-sm text-gray-500">₹{item.price.toFixed(2)}</p>
                 </div>
                 <div className="flex items-center gap-2 bg-background rounded-md p-1">
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive" 
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
                     onClick={() => onDecrement(item.id)}
                   >
                     {item.quantity === 1 ? <Trash2 className="h-4 w-4" /> : <Minus className="h-4 w-4" />}
                   </Button>
                   <span className="w-6 text-center font-medium">{item.quantity}</span>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-8 w-8 hover:bg-primary/10 hover:text-primary" 
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 hover:bg-primary/10 hover:text-primary"
                     onClick={() => onIncrement(item.id)}
                   >
                     <Plus className="h-4 w-4" />

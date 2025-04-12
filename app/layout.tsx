@@ -9,7 +9,6 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "Drone Delivery App",
   description: "Quick drone delivery at your doorstep",
-    generator: 'v0.dev'
 }
 
 export default function RootLayout({
