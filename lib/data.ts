@@ -52,7 +52,7 @@ export const products = [
     id: 8,
     name: "Iced Tea",
     price: 99,
-    image: "https://images.unsplash.com/photo-1551024709-8f681bc7d1e3?w=200&h=200&fit=crop",
+    image: "https://images.unsplash.com/photo-1499638673689-79a0b5115d87?q=80&w=1964&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
     description: "Refreshing iced tea with lemon.",
   },
 ]
