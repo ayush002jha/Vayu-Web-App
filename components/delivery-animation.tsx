@@ -20,7 +20,7 @@ const animationStyles = `
 `;
 
 // --- Configuration ---
-const STORE_COORDS: L.LatLngTuple = [12.9794, 77.5907];
+const STORE_COORDS: L.LatLngTuple = [13.069768, 77.541407];
 const storeLatLng: L.LatLng = L.latLng(STORE_COORDS);
 const USER_COORDS_FOR_TESTING: L.LatLngTuple = [12.9716, 77.6946];
 const DELIVERY_TIME_SECONDS: number = 25;
