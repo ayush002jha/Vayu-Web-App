@@ -7,6 +7,9 @@ import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from 'react-
 import L, { LatLngExpression, LatLng } from 'leaflet'; // Import types
 import 'leaflet/dist/leaflet.css';
 
+//ANCHOR - Rishabh was here: --
+import { ShoppingCart } from "./shopping-cart";
+
 // --- CSS Styles (Optional: Can be moved to a separate CSS file) ---
 const animationStyles = `
   @keyframes pulse {
@@ -28,40 +31,40 @@ const CURVE_STEPS: number = 50; // Number of points for the curved path
 
 // --- Helper Function for Curved Line Points ---
 function getCurvedLinePoints(start: L.LatLng, end: L.LatLng, steps: number = CURVE_STEPS): L.LatLngExpression[] {
-    const points: L.LatLngExpression[] = [];
-    const latOffset = (end.lng - start.lng) * 0.12;
-    const lngOffset = (start.lat - end.lat) * 0.12;
-    const controlPoint = L.latLng(
-      (start.lat + end.lat) / 2 + latOffset,
-      (start.lng + end.lng) / 2 + lngOffset
-    );
+  const points: L.LatLngExpression[] = [];
+  const latOffset = (end.lng - start.lng) * 0.12;
+  const lngOffset = (start.lat - end.lat) * 0.12;
+  const controlPoint = L.latLng(
+    (start.lat + end.lat) / 2 + latOffset,
+    (start.lng + end.lng) / 2 + lngOffset
+  );
 
-    for (let i = 0; i <= steps; i++) {
-      const t = i / steps;
-      const lat = (1 - t) * (1 - t) * start.lat + 2 * (1 - t) * t * controlPoint.lat + t * t * end.lat;
-      const lng = (1 - t) * (1 - t) * start.lng + 2 * (1 - t) * t * controlPoint.lng + t * t * end.lng;
-      if (isFinite(lat) && isFinite(lng)) {
-          points.push([lat, lng]);
-      } else {
-          console.warn(`>>> Invalid point generated at step ${i} (t=${t}): [${lat}, ${lng}]`);
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const lat = (1 - t) * (1 - t) * start.lat + 2 * (1 - t) * t * controlPoint.lat + t * t * end.lat;
+    const lng = (1 - t) * (1 - t) * start.lng + 2 * (1 - t) * t * controlPoint.lng + t * t * end.lng;
+    if (isFinite(lat) && isFinite(lng)) {
+      points.push([lat, lng]);
+    } else {
+      console.warn(`>>> Invalid point generated at step ${i} (t=${t}): [${lat}, ${lng}]`);
+    }
+  }
+  // Ensure the final exact end point is included
+  if (points.length > 0) {
+    const lastPoint = points[points.length - 1];
+    if (Array.isArray(lastPoint) && (lastPoint[0] !== end.lat || lastPoint[1] !== end.lng)) {
+      if (isFinite(end.lat) && isFinite(end.lng)) {
+        points.push([end.lat, end.lng]);
       }
     }
-    // Ensure the final exact end point is included
-    if (points.length > 0) {
-      const lastPoint = points[points.length - 1];
-      if (Array.isArray(lastPoint) && (lastPoint[0] !== end.lat || lastPoint[1] !== end.lng)) {
-          if (isFinite(end.lat) && isFinite(end.lng)) {
-              points.push([end.lat, end.lng]);
-          }
-      }
-    } else if (isFinite(end.lat) && isFinite(end.lng)) {
-      // Handle case where only start/end are valid
-      if (isFinite(start.lat) && isFinite(start.lng)) {
-          points.push([start.lat, start.lng]);
-      }
-      points.push([end.lat, end.lng]);
+  } else if (isFinite(end.lat) && isFinite(end.lng)) {
+    // Handle case where only start/end are valid
+    if (isFinite(start.lat) && isFinite(start.lng)) {
+      points.push([start.lat, start.lng]);
     }
-    return points;
+    points.push([end.lat, end.lng]);
+  }
+  return points;
 }
 
 // --- Custom Leaflet Icons ---
@@ -77,51 +80,51 @@ const storeIcon: L.Icon = new L.Icon({
 });
 
 const destinationIcon: L.DivIcon = new L.DivIcon({
-    className: 'destination-icon',
-    html: `<div style="background-color:#0ea5e9;width:16px;height:16px;border-radius:50%;border:2px solid white;box-shadow:0 0 6px rgba(14, 165, 233, 0.7);"></div>`,
-    iconSize: [16, 16],
-    iconAnchor: [8, 8]
+  className: 'destination-icon',
+  html: `<div style="background-color:#0ea5e9;width:16px;height:16px;border-radius:50%;border:2px solid white;box-shadow:0 0 6px rgba(14, 165, 233, 0.7);"></div>`,
+  iconSize: [16, 16],
+  iconAnchor: [8, 8]
 });
 
 const droneImageIcon: L.Icon = new L.Icon({
-    iconUrl: '/icons/drone.png', // Path to your drone image
-    iconSize: [35, 35],       // Adjust size
-    iconAnchor: [17.5, 17.5], // Adjust anchor to center
-    popupAnchor: [0, -17.5],
+  iconUrl: '/icons/drone.png', // Path to your drone image
+  iconSize: [35, 35],       // Adjust size
+  iconAnchor: [17.5, 17.5], // Adjust anchor to center
+  popupAnchor: [0, -17.5],
 });
 
 // --- Delivery Path Component ---
 interface DeliveryPathProps {
-    pathPoints: L.LatLngExpression[] | null;
+  pathPoints: L.LatLngExpression[] | null;
 }
 
 function DeliveryPath({ pathPoints }: DeliveryPathProps): React.ReactElement | null {
-    if (!pathPoints || pathPoints.length < 2) return null;
-    return (
-      <Polyline
-        positions={pathPoints}
-        pathOptions={{ color: '#0ea5e9', weight: 3, dashArray: '8, 8', opacity: 0.7 }}
-      />
-    );
+  if (!pathPoints || pathPoints.length < 2) return null;
+  return (
+    <Polyline
+      positions={pathPoints}
+      pathOptions={{ color: '#0ea5e9', weight: 3, dashArray: '8, 8', opacity: 0.7 }}
+    />
+  );
 }
 
 // --- Map Adjustment Component ---
 interface MapBoundsAdjusterProps {
-    storeLoc: L.LatLngExpression;
-    userLoc: L.LatLng | null;
+  storeLoc: L.LatLngExpression;
+  userLoc: L.LatLng | null;
 }
 
 function MapBoundsAdjuster({ storeLoc, userLoc }: MapBoundsAdjusterProps): null {
-    const map = useMap();
-    useEffect(() => {
-      if (userLoc instanceof L.LatLng) {
-        const bounds = L.latLngBounds([storeLoc, userLoc]);
-        map.flyToBounds(bounds, { padding: [50, 50], duration: 1.2 });
-      } else {
-        map.flyTo(storeLoc, 13, { duration: 1 });
-      }
-    }, [storeLoc, userLoc, map]);
-    return null;
+  const map = useMap();
+  useEffect(() => {
+    if (userLoc instanceof L.LatLng) {
+      const bounds = L.latLngBounds([storeLoc, userLoc]);
+      map.flyToBounds(bounds, { padding: [50, 50], duration: 1.2 });
+    } else {
+      map.flyTo(storeLoc, 13, { duration: 1 });
+    }
+  }, [storeLoc, userLoc, map]);
+  return null;
 }
 
 
@@ -154,13 +157,19 @@ export function DeliveryAnimation(): React.ReactElement {
 
     const successCallback = (position: GeolocationPosition) => { // Add explicit type
       const { latitude, longitude } = position.coords;
-      console.log(`>>> User location fetched successfully: Lat: ${latitude}, Lng: ${longitude}`);
+      //ANCHOR - Rishabh was here: --
+      console.log(`"file_name: delivery-animation.tsx -- line_no: 161",Lat: ${latitude}, Lng: ${longitude}`);
+      
+      // console.log(`>>> User location fetched successfully: Lat: ${latitude}, Lng: ${longitude}`);
       setCurrentUserLocation(L.latLng(latitude, longitude)); // Create LatLng object
+      //ANCHOR - Rishabh was here: --
+      // console.log("file_name: delivery-animation.tsx -- line_no: 164",currentUserLocation);
+
       setIsLocating(false); // Location found
       setLocationError(null); // Clear any previous error
       setStatusText("Calculating route..."); // Update status
     };
-
+    
     const errorCallback = (error: GeolocationPositionError) => { // Add explicit type
       console.error("!!! Error getting user location:", error.message, `(Code: ${error.code})`);
       let message = "Could not fetch your location.";
@@ -202,26 +211,26 @@ export function DeliveryAnimation(): React.ReactElement {
   // --- Effect to Calculate Path ---
   useEffect(() => {
     if (currentUserLocation instanceof L.LatLng) {
-       console.log(">>> Effect: Location valid. Calculating curve points...");
-       const points = getCurvedLinePoints(storeLatLng, currentUserLocation, CURVE_STEPS);
-       if (points && points.length >= 2) {
-          setDeliveryPathPoints(points);
-          setDronePosition(points[0]); // Start drone at path start
-          console.log(`>>> Path points calculated (${points.length}). Ready. Start:`, points[0]);
-          setStatusText("Ready to depart...");
-       } else {
-          console.error("!!! Path calculation failed.");
-          setDeliveryPathPoints(null);
-          setDronePosition(STORE_COORDS);
-          setStatusText("Route unavailable");
-          setLocationError("Could not calculate a valid delivery route.");
-       }
+      console.log(">>> Effect: Location valid. Calculating curve points...");
+      const points = getCurvedLinePoints(storeLatLng, currentUserLocation, CURVE_STEPS);
+      if (points && points.length >= 2) {
+        setDeliveryPathPoints(points);
+        setDronePosition(points[0]); // Start drone at path start
+        console.log(`>>> Path points calculated (${points.length}). Ready. Start:`, points[0]);
+        setStatusText("Ready to depart...");
+      } else {
+        console.error("!!! Path calculation failed.");
+        setDeliveryPathPoints(null);
+        setDronePosition(STORE_COORDS);
+        setStatusText("Route unavailable");
+        setLocationError("Could not calculate a valid delivery route.");
+      }
     } else {
-       setDeliveryPathPoints(null);
-       setDronePosition(STORE_COORDS);
-       if (!isLocating && !locationError) {
-           setStatusText("Waiting for destination...");
-       }
+      setDeliveryPathPoints(null);
+      setDronePosition(STORE_COORDS);
+      if (!isLocating && !locationError) {
+        setStatusText("Waiting for destination...");
+      }
     }
   }, [currentUserLocation, isLocating, locationError]);
 
@@ -243,23 +252,23 @@ export function DeliveryAnimation(): React.ReactElement {
       setDronePosition(deliveryPathPoints[0]);
 
       if (totalSteps <= 1) {
-          console.warn("!!! Animation Warning: Path has 1 or 0 points.");
-          setProgress(100); setEstimatedTime(0); setIsAnimating(false);
-          if (currentUserLocation) setDronePosition([currentUserLocation.lat, currentUserLocation.lng]);
-          setStatusText("✅ Drone has arrived!");
-          return;
+        console.warn("!!! Animation Warning: Path has 1 or 0 points.");
+        setProgress(100); setEstimatedTime(0); setIsAnimating(false);
+        if (currentUserLocation) setDronePosition([currentUserLocation.lat, currentUserLocation.lng]);
+        setStatusText("✅ Drone has arrived!");
+        return;
       }
 
       const intervalTime = (DELIVERY_TIME_SECONDS * 1000) / (totalSteps - 1);
       console.log(`>>> Calculated Interval Time: ${intervalTime.toFixed(2)}ms`);
 
       if (intervalTime <= 0 || !isFinite(intervalTime)) {
-          console.error(`!!! Animation Failed: Invalid interval time (${intervalTime}).`);
-          setIsAnimating(false); setStatusText("Animation Error"); return;
+        console.error(`!!! Animation Failed: Invalid interval time (${intervalTime}).`);
+        setIsAnimating(false); setStatusText("Animation Error"); return;
       }
       if (intervalRef.current) {
-          console.warn(">>> Clearing leftover interval.");
-          clearInterval(intervalRef.current); intervalRef.current = null;
+        console.warn(">>> Clearing leftover interval.");
+        clearInterval(intervalRef.current); intervalRef.current = null;
       }
 
       console.log(">>> Starting setInterval animation loop...");
@@ -269,13 +278,13 @@ export function DeliveryAnimation(): React.ReactElement {
 
           // --- CRITICAL VALIDATION ---
           if (Array.isArray(nextPos) && nextPos.length === 2 && typeof nextPos[0] === 'number' && typeof nextPos[1] === 'number' && isFinite(nextPos[0]) && isFinite(nextPos[1])) {
-             setDronePosition(nextPos);
+            setDronePosition(nextPos);
           } else {
-             console.error(`!!! Invalid position data at step ${currentStep}:`, nextPos, "- Stopping animation.");
-             if (intervalRef.current) clearInterval(intervalRef.current);
-             intervalRef.current = null; setIsAnimating(false); setStatusText("Animation Error: Invalid path data");
-             if (currentUserLocation) setDronePosition([currentUserLocation.lat, currentUserLocation.lng]);
-             return;
+            console.error(`!!! Invalid position data at step ${currentStep}:`, nextPos, "- Stopping animation.");
+            if (intervalRef.current) clearInterval(intervalRef.current);
+            intervalRef.current = null; setIsAnimating(false); setStatusText("Animation Error: Invalid path data");
+            if (currentUserLocation) setDronePosition([currentUserLocation.lat, currentUserLocation.lng]);
+            return;
           }
           // --- END VALIDATION ---
 
@@ -286,7 +295,7 @@ export function DeliveryAnimation(): React.ReactElement {
           setProgress(displayProgress);
           setEstimatedTime(displayTime);
           if (displayProgress < 100) {
-             setStatusText(`Estimated arrival in ${Math.ceil(displayTime)} seconds`);
+            setStatusText(`Estimated arrival in ${Math.ceil(displayTime)} seconds`);
           }
           currentStep++;
 
@@ -298,24 +307,24 @@ export function DeliveryAnimation(): React.ReactElement {
 
           // --- Final State Updates ---
           if (currentUserLocation instanceof L.LatLng) {
-              const finalPos: L.LatLngExpression = [currentUserLocation.lat, currentUserLocation.lng];
-               if (Array.isArray(finalPos) && finalPos.length === 2 && typeof finalPos[0] === 'number' && typeof finalPos[1] === 'number' && isFinite(finalPos[0]) && isFinite(finalPos[1])) {
-                   setDronePosition(finalPos);
-                   console.log(">>> Final position set to user location:", finalPos);
-               } else {
-                   console.error("!!! Invalid final user location, attempting fallback:", finalPos);
-                   const lastValidPathPoint = deliveryPathPoints[deliveryPathPoints.length - 1];
-                   if (Array.isArray(lastValidPathPoint) && lastValidPathPoint.length === 2 && typeof lastValidPathPoint[0] === 'number' && typeof lastValidPathPoint[1] === 'number' && isFinite(lastValidPathPoint[0]) && isFinite(lastValidPathPoint[1])) {
-                       setDronePosition(lastValidPathPoint);
-                       console.log(">>> Final position set to last valid path point (fallback):", lastValidPathPoint);
-                   } else { console.error("!!! Fallback failed - last path point also invalid."); }
-               }
+            const finalPos: L.LatLngExpression = [currentUserLocation.lat, currentUserLocation.lng];
+            if (Array.isArray(finalPos) && finalPos.length === 2 && typeof finalPos[0] === 'number' && typeof finalPos[1] === 'number' && isFinite(finalPos[0]) && isFinite(finalPos[1])) {
+              setDronePosition(finalPos);
+              console.log(">>> Final position set to user location:", finalPos);
+            } else {
+              console.error("!!! Invalid final user location, attempting fallback:", finalPos);
+              const lastValidPathPoint = deliveryPathPoints[deliveryPathPoints.length - 1];
+              if (Array.isArray(lastValidPathPoint) && lastValidPathPoint.length === 2 && typeof lastValidPathPoint[0] === 'number' && typeof lastValidPathPoint[1] === 'number' && isFinite(lastValidPathPoint[0]) && isFinite(lastValidPathPoint[1])) {
+                setDronePosition(lastValidPathPoint);
+                console.log(">>> Final position set to last valid path point (fallback):", lastValidPathPoint);
+              } else { console.error("!!! Fallback failed - last path point also invalid."); }
+            }
           } else {
-               console.warn(">>> No valid currentUserLocation at animation end. Using last path point.");
-               const lastValidPathPoint = deliveryPathPoints[deliveryPathPoints.length - 1];
-               if (Array.isArray(lastValidPathPoint) && lastValidPathPoint.length === 2 && typeof lastValidPathPoint[0] === 'number' && typeof lastValidPathPoint[1] === 'number' && isFinite(lastValidPathPoint[0]) && isFinite(lastValidPathPoint[1])) {
-                    setDronePosition(lastValidPathPoint);
-               }
+            console.warn(">>> No valid currentUserLocation at animation end. Using last path point.");
+            const lastValidPathPoint = deliveryPathPoints[deliveryPathPoints.length - 1];
+            if (Array.isArray(lastValidPathPoint) && lastValidPathPoint.length === 2 && typeof lastValidPathPoint[0] === 'number' && typeof lastValidPathPoint[1] === 'number' && isFinite(lastValidPathPoint[0]) && isFinite(lastValidPathPoint[1])) {
+              setDronePosition(lastValidPathPoint);
+            }
           }
 
           setProgress(100);
@@ -331,15 +340,15 @@ export function DeliveryAnimation(): React.ReactElement {
       return () => {
         console.log(">>> Cleanup: Clearing animation interval (if any) ref:", intervalRef.current);
         if (intervalRef.current) {
-            clearInterval(intervalRef.current);
-            intervalRef.current = null;
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
         }
         setIsAnimating(false);
       };
 
     } else {
-        console.log(">>> Animation effect skipped: No valid path points.");
-        setIsAnimating(false);
+      console.log(">>> Animation effect skipped: No valid path points.");
+      setIsAnimating(false);
     }
   }, [deliveryPathPoints, currentUserLocation]); // Dependencies
 
@@ -352,7 +361,7 @@ export function DeliveryAnimation(): React.ReactElement {
   }, [currentUserLocation]);
 
   const mapInitialZoom = useMemo<number>(() => {
-      return currentUserLocation instanceof L.LatLng ? 12 : 13;
+    return currentUserLocation instanceof L.LatLng ? 12 : 13;
   }, [currentUserLocation]);
 
 
@@ -368,12 +377,12 @@ export function DeliveryAnimation(): React.ReactElement {
   }
 
   if (locationError) {
-     return (
+    return (
       <div className="flex flex-col justify-center items-center h-80 md:h-96 py-10 px-4 text-center">
-         <p className="text-lg font-medium text-red-600">Error: {locationError}</p>
-         <p className="text-sm text-gray-500 mt-2">{statusText}</p>
-     </div>
-     );
+        <p className="text-lg font-medium text-red-600">Error: {locationError}</p>
+        <p className="text-sm text-gray-500 mt-2">{statusText}</p>
+      </div>
+    );
   }
 
   return (
@@ -384,11 +393,11 @@ export function DeliveryAnimation(): React.ReactElement {
 
       <div className="relative w-full h-96 md:h-[500px] bg-gray-300 rounded-lg mb-8 overflow-hidden border border-gray-300 shadow-lg">
         <MapContainer
-           key={currentUserLocation ? `map-${currentUserLocation.lat.toFixed(5)}-${currentUserLocation.lng.toFixed(5)}` : 'map-loading'}
-           center={mapCenter}
-           zoom={mapInitialZoom}
-           scrollWheelZoom={true}
-           style={{ height: '100%', width: '100%' }}
+          key={currentUserLocation ? `map-${currentUserLocation.lat.toFixed(5)}-${currentUserLocation.lng.toFixed(5)}` : 'map-loading'}
+          center={mapCenter}
+          zoom={mapInitialZoom}
+          scrollWheelZoom={true}
+          style={{ height: '100%', width: '100%' }}
         >
           <TileLayer
             attribution='© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions" target="_blank" rel="noopener noreferrer">CARTO</a>'
@@ -403,9 +412,9 @@ export function DeliveryAnimation(): React.ReactElement {
 
           {currentUserLocation instanceof L.LatLng && (
             <Marker
-                position={currentUserLocation}
-                icon={destinationIcon} // Use blue ball
-                zIndexOffset={100}
+              position={currentUserLocation}
+              icon={destinationIcon} // Use blue ball
+              zIndexOffset={100}
             >
               <Popup><span className="font-semibold">Your Location</span><br /> Drop-off Point</Popup>
             </Marker>
@@ -413,39 +422,46 @@ export function DeliveryAnimation(): React.ReactElement {
 
           {/* Animated Drone Marker */}
           <Marker
-             position={dronePosition}
-             icon={droneImageIcon} // Use drone image
-             zIndexOffset={1000}
+            position={dronePosition}
+            icon={droneImageIcon} // Use drone image
+            zIndexOffset={1000}
           />
         </MapContainer>
       </div>
 
-       {/* Progress Bar and Status Text */}
-       <div className="w-full max-w-md px-4">
-         <div className="flex justify-between text-xs mb-1 text-gray-500 font-medium px-1">
-           <span>Departed Store</span>
-           <span className={`transition-opacity duration-300 ${progress > 5 && progress < 95 ? 'opacity-100' : 'opacity-50'}`}>
-             In Transit
-           </span>
-           <span className={`transition-opacity duration-300 ${progress >= 100 ? 'opacity-100' : 'opacity-50'}`}>
-               Arrived
-           </span>
-         </div>
-         <div className="w-full bg-gray-200 rounded-full h-3 mb-3 overflow-hidden shadow-inner">
-           <div
-             className="bg-gradient-to-r from-blue-400 to-sky-500 h-3 rounded-full transition-all duration-150 ease-linear"
-             style={{ width: `${progress}%` }}
-             role="progressbar"
-             aria-valuenow={progress}
-             aria-valuemin={0}
-             aria-valuemax={100}
-             aria-label="Delivery progress"
-           ></div>
-         </div>
-         <p className="text-center text-gray-700 h-5 text-sm font-medium">
-            {statusText}
-         </p>
-       </div>
+      {/* Progress Bar and Status Text */}
+      <div className="w-full max-w-md px-4">
+        <div className="flex justify-between text-xs mb-1 text-gray-500 font-medium px-1">
+          <span>Departed Store</span>
+          <span className={`transition-opacity duration-300 ${progress > 5 && progress < 95 ? 'opacity-100' : 'opacity-50'}`}>
+            In Transit
+          </span>
+          <span className={`transition-opacity duration-300 ${progress >= 100 ? 'opacity-100' : 'opacity-50'}`}>
+            Arrived
+          </span>
+        </div>
+        <div className="w-full bg-gray-200 rounded-full h-3 mb-3 overflow-hidden shadow-inner">
+          <div
+            className="bg-gradient-to-r from-blue-400 to-sky-500 h-3 rounded-full transition-all duration-150 ease-linear"
+            style={{ width: `${progress}%` }}
+            role="progressbar"
+            aria-valuenow={progress}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label="Delivery progress"
+          ></div>
+        </div>
+        <p className="text-center text-gray-700 h-5 text-sm font-medium">
+          {statusText}
+        </p>
+      </div>
+      {/** //ANCHOR - Rishabh was here: - */ }
     </div>
   );
+}
+
+//ANCHOR - Rishabh was here: --
+export function getCoords(position: GeolocationPosition) {
+  const { latitude, longitude } = position.coords;
+  return { latitude, longitude };
 }
