@@ -7,9 +7,6 @@ import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from 'react-
 import L, { LatLngExpression, LatLng } from 'leaflet'; // Import types
 import 'leaflet/dist/leaflet.css';
 
-//ANCHOR - Rishabh was here: --
-import { ShoppingCart } from "./shopping-cart";
-
 // --- CSS Styles (Optional: Can be moved to a separate CSS file) ---
 const animationStyles = `
   @keyframes pulse {
@@ -460,8 +457,3 @@ export function DeliveryAnimation(): React.ReactElement {
   );
 }
 
-//ANCHOR - Rishabh was here: --
-export function getCoords(position: GeolocationPosition) {
-  const { latitude, longitude } = position.coords;
-  return { latitude, longitude };
-}
