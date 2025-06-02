@@ -31,6 +31,27 @@ interface ShoppingCartProps {
   onDecrement: (id: number) => void
 }
 
+async function triggerDrone(): Promise<void> {
+  try {
+    const response = await fetch('https://nearly-daring-gannet.ngrok-free.app:5000/trigger', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      // If your endpoint expects a JSON body, include it here; otherwise, omit the body
+      body: JSON.stringify({})
+    });
+
+    if (!response.ok) {
+      throw new Error(`Server responded with status ${response.status}`);
+    }
+
+    const result: { status: string } = await response.json();
+    console.log('Drone triggered:', result);
+  } catch (error) {
+    console.error('Error triggering drone:', error);
+  }
+}
 export function ShoppingCart({ items, onIncrement, onDecrement }: ShoppingCartProps) {
   const [checkoutStep, setCheckoutStep] = useState<"cart" | "delivery" | "completed">("cart")
 
@@ -39,6 +60,7 @@ export function ShoppingCart({ items, onIncrement, onDecrement }: ShoppingCartPr
 
   const handleCheckout = () => {
     setCheckoutStep("delivery")
+    triggerDrone();
 
     // Simulate delivery completion after 10 seconds
     setTimeout(() => {
