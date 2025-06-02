@@ -36,7 +36,7 @@ interface ShoppingCartProps {
 
 async function triggerDrone(): Promise<void> {
   try {
-    const response = await fetch('https://nearly-daring-gannet.ngrok-free.app:5000/trigger', {
+    const response = await fetch('https://nearly-daring-gannet.ngrok-free.app/trigger', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
