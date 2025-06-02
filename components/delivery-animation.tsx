@@ -23,7 +23,7 @@ const animationStyles = `
 const STORE_COORDS: L.LatLngTuple = [13.069768, 77.541407];
 const storeLatLng: L.LatLng = L.latLng(STORE_COORDS);
 const USER_COORDS_FOR_TESTING: L.LatLngTuple = [12.9716, 77.6946];
-const DELIVERY_TIME_SECONDS: number = 25;
+const DELIVERY_TIME_SECONDS: number = 15;
 const CURVE_STEPS: number = 50; // Number of points for the curved path
 
 // --- Helper Function for Curved Line Points ---
