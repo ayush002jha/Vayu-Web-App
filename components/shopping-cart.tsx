@@ -8,6 +8,10 @@ import { Separator } from "@/components/ui/separator"
 // import { DeliveryAnimation } from "@/components/delivery-animation"
 import dynamic from 'next/dynamic';
 import { Suspense } from 'react'; // Optional but good for loading states
+//ANCHOR - Rishabh Was here: -- 
+import { getCoords } from "@/components/delivery-animation";
+
+
 // With a dynamic import:
 const DynamicDeliveryAnimation = dynamic(
   () => import('@/components/delivery-animation') // Adjust path to your component
@@ -17,6 +21,7 @@ const DynamicDeliveryAnimation = dynamic(
     loading: () => <div className="flex justify-center items-center h-96"><p>Loading map...</p></div> // Optional: Show a loading message
   }
 );
+
 interface CartItem {
   id: number
   name: string
@@ -29,6 +34,7 @@ interface ShoppingCartProps {
   items: CartItem[]
   onIncrement: (id: number) => void
   onDecrement: (id: number) => void
+  userCoordinates?: { latitude: number; longitude: number } | null;
 }
 
 export function ShoppingCart({ items, onIncrement, onDecrement }: ShoppingCartProps) {
@@ -38,6 +44,7 @@ export function ShoppingCart({ items, onIncrement, onDecrement }: ShoppingCartPr
   const deliveryFee = 49.99
 
   const handleCheckout = () => {
+
     setCheckoutStep("delivery")
 
     // Simulate delivery completion after 10 seconds
@@ -75,6 +82,42 @@ export function ShoppingCart({ items, onIncrement, onDecrement }: ShoppingCartPr
         <Button onClick={handleNewOrder}>Place New Order</Button>
       </div>
     )
+  }
+
+  //ANCHOR - Rishabh Was here: --
+  function useLocation(position: GeolocationPosition) {
+    const { latitude, longitude } = getCoords(position);
+    console.log("file_name: shopping-cart.tsx -- line_no: 89", latitude, longitude);
+    sendLocationToEndpoint(latitude, longitude);
+  }
+
+  //ANCHOR - Rishabh Was here: --
+  async function sendLocationToEndpoint(latitude: number, longitude: number) {
+    try {
+      const response = await fetch("/api/place-order", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          location: {
+            latitude,
+            longitude,
+          },
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to send location")
+      }
+
+      const result = await response.json()
+      console.log("Location sent successfully:", result)
+      return result
+    } catch (error) {
+      console.error("Error sending location:", error)
+      return null
+    }
   }
 
   return (
@@ -133,7 +176,7 @@ export function ShoppingCart({ items, onIncrement, onDecrement }: ShoppingCartPr
               <span>Total</span>
               <span>₹{(totalPrice + deliveryFee).toFixed(2)}</span>
             </div>
-            <Button className="w-full" size="lg" onClick={handleCheckout} disabled={items.length === 0}>
+            <Button className="w-full" size="lg" onClick={() => { handleCheckout(), useLocation }} disabled={items.length === 0}>
               Place Order
             </Button>
           </div>
