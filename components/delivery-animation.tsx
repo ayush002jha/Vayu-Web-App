@@ -78,8 +78,8 @@ export function DeliveryAnimation(): React.ReactElement {
     setStatusText("Using test location...");
 
     // Replace these with your desired test coordinates
-    const testLat = 47.395897;
-    const testLng = 8.547884;
+    const testLat = 47.396831;
+    const testLng = 8.546584;
 
     const latlng = L.latLng(testLat, testLng);
     setCurrentUserLocation(latlng);
