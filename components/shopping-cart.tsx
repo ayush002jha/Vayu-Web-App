@@ -1,85 +1,105 @@
-"use client"
+// ShoppingCart.tsx
+"use client";
 
-import { useState } from "react"
-import Image from "next/image"
-import { Button } from "@/components/ui/button"
-import { Minus, Plus, Trash2 } from "lucide-react"
-import { Separator } from "@/components/ui/separator"
-// import { DeliveryAnimation } from "@/components/delivery-animation"
-import dynamic from 'next/dynamic';
-import { Suspense } from 'react'; // Optional but good for loading states
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import dynamic from "next/dynamic";
+import { Suspense } from "react";
+import Image from "next/image";
+import { Trash2, Minus, Plus } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
 
-// With a dynamic import:
 const DynamicDeliveryAnimation = dynamic(
-  () => import('@/components/delivery-animation') // Adjust path to your component
-    .then((mod) => mod.DeliveryAnimation), // Make sure to access the named export
+  () => import("@/components/delivery-animation").then((mod) => mod.DeliveryAnimation),
   {
-    ssr: false, // <--- This is the crucial part! Disables server-side rendering for this component
-    loading: () => <div className="flex justify-center items-center h-96"><p>Loading map...</p></div> // Optional: Show a loading message
+    ssr: false,
+    loading: () => (
+      <div className="flex justify-center items-center h-96">
+        <p>Loading map...</p>
+      </div>
+    ),
   }
 );
 
 interface CartItem {
-  id: number
-  name: string
-  price: number
-  image: string
-  quantity: number
+  id: number;
+  name: string;
+  price: number;
+  image: string;
+  quantity: number;
 }
 
 interface ShoppingCartProps {
-  items: CartItem[]
-  onIncrement: (id: number) => void
-  onDecrement: (id: number) => void
-  userCoordinates?: { latitude: number; longitude: number } | null;
+  items: CartItem[];
+  onIncrement: (id: number) => void;
+  onDecrement: (id: number) => void;
 }
 
-async function triggerDrone(): Promise<void> {
-  try {
-    const response = await fetch('https://nearly-daring-gannet.ngrok-free.app/trigger', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      // If your endpoint expects a JSON body, include it here; otherwise, omit the body
-      body: JSON.stringify({})
-    });
+export function ShoppingCart({ items, onIncrement, onDecrement }: ShoppingCartProps) {
+  const [checkoutStep, setCheckoutStep] = useState<"cart" | "delivery" | "completed">("cart");
+  const [orderError, setOrderError] = useState<string | null>(null);
 
-    if (!response.ok) {
-      throw new Error(`Server responded with status ${response.status}`);
+  const totalPrice = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const deliveryFee = 49.99;
+
+  const handleCheckout = async () => {
+    setOrderError(null);
+
+    if (!navigator.geolocation) {
+      setOrderError("Geolocation is not supported by your browser.");
+      return;
     }
 
-    const result: { status: string } = await response.json();
-    console.log('Drone triggered:', result);
-  } catch (error) {
-    console.error('Error triggering drone:', error);
-  }
-}
-export function ShoppingCart({ items, onIncrement, onDecrement }: ShoppingCartProps) {
-  const [checkoutStep, setCheckoutStep] = useState<"cart" | "delivery" | "completed">("cart")
+    // 1) Resolve geolocation on button click
+    let coords: GeolocationPosition["coords"];
+    try {
+      coords = await new Promise<GeolocationPosition["coords"]>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => resolve(pos.coords),
+          (err) => reject(err),
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+      });
+    } catch (err: any) {
+      setOrderError(err?.message || "Could not fetch your location.");
+      return;
+    }
 
-  const totalPrice = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
-  const deliveryFee = 49.99
+    // 2) Send correct JSON to FastAPI to avoid 422
+    try {
+      const res = await fetch("https://famous-eternal-pipefish.ngrok-free.app/trigger", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          target_lat: coords.latitude,
+          target_lon: coords.longitude,
+          // altitude_m is optional; omit or set null
+        }),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Trigger failed: ${res.status} ${text}`);
+      }
+    } catch (err: any) {
+      setOrderError(err?.message || "Failed to trigger mission.");
+      return;
+    }
 
-  const handleCheckout = () => {
+    // 3) Switch to DeliveryAnimation screen
+    setCheckoutStep("delivery");
 
-    setCheckoutStep("delivery")
-    triggerDrone();
-
-    // Simulate delivery completion after 10 seconds
-    setTimeout(() => {
-      setCheckoutStep("completed")
-    }, 30000)
-  }
-
-  const handleNewOrder = () => {
-    setCheckoutStep("cart")
-  }
+    // // 4) Optionally auto-complete after 30s (your existing behavior)
+    // setTimeout(() => {
+    //   setCheckoutStep("completed");
+    // }, 30000);
+  };
 
   if (checkoutStep === "delivery") {
-    return (<Suspense fallback={<p>Loading map...</p>}>
-      <DynamicDeliveryAnimation />
-    </Suspense>)
+    return (
+      <Suspense fallback={<p>Loading map...</p>}>
+        <DynamicDeliveryAnimation />
+      </Suspense>
+    );
   }
 
   if (checkoutStep === "completed") {
@@ -98,16 +118,71 @@ export function ShoppingCart({ items, onIncrement, onDecrement }: ShoppingCartPr
         </div>
         <h2 className="text-2xl font-bold mb-2">Delivery Completed!</h2>
         <p className="text-gray-500 mb-6">Your items have been delivered successfully.</p>
-        <Button onClick={handleNewOrder}>Place New Order</Button>
+        <Button onClick={() => setCheckoutStep("cart")}>Place New Order</Button>
       </div>
-    )
+    );
   }
+  // Dummy function for testing
+  const handleTestDrone = async () => {
+    setOrderError(null);
+    
+    // Hardcoded test coordinates
+    const testCoords = {
+      target_lat: 47.395897,  // Change these to your preferred test location
+      target_lon: 8.547884,
+      // altitude_m: 50       // Optional
+    };
+
+    try {
+      console.log('🧪 Testing with dummy coordinates:', testCoords);
+      
+      const res = await fetch("https://famous-eternal-pipefish.ngrok-free.app/trigger", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(testCoords),
+      });
+      
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Trigger failed: ${res.status} ${text}`);
+      }
+
+      const result = await res.json();
+      console.log('✅ Test mission accepted:', result);
+      
+      // Switch to delivery animation
+      setCheckoutStep("delivery");
+      
+
+      
+    } catch (err: any) {
+      setOrderError(err?.message || "Failed to trigger test mission.");
+    }
+  };
 
 
 
   return (
     <div className="py-4">
       <h2 className="text-xl font-bold mb-4">Your Cart</h2>
+      {orderError && (
+        <div className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded p-2">
+          {orderError}
+        </div>
+      )}
+
+      {/* Test button for development */}
+      <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
+        <p className="text-sm text-yellow-800 mb-2">🧪 Testing Mode</p>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={handleTestDrone}
+          className="w-full border-yellow-300 text-yellow-700 hover:bg-yellow-100"
+        >
+          Test Drone with Dummy Coordinates
+        </Button>
+      </div>
       {items.length === 0 ? (
         <div className="text-center py-10">
           <p className="text-gray-500">Your cart is empty</p>
