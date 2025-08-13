@@ -38,6 +38,9 @@ interface ShoppingCartProps {
 export function ShoppingCart({ items, onIncrement, onDecrement }: ShoppingCartProps) {
   const [checkoutStep, setCheckoutStep] = useState<"cart" | "delivery" | "completed">("cart");
   const [orderError, setOrderError] = useState<string | null>(null);
+  
+  // NEW: Global altitude state
+  const [altitude, setAltitude] = useState<number>(50); // Default 50m
 
   const totalPrice = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const deliveryFee = 49.99;
@@ -65,7 +68,7 @@ export function ShoppingCart({ items, onIncrement, onDecrement }: ShoppingCartPr
       return;
     }
 
-    // 2) Send correct JSON to FastAPI to avoid 422
+    // 2) Send correct JSON to FastAPI with global altitude
     try {
       const res = await fetch("https://famous-eternal-pipefish.ngrok-free.app/trigger", {
         method: "POST",
@@ -73,7 +76,7 @@ export function ShoppingCart({ items, onIncrement, onDecrement }: ShoppingCartPr
         body: JSON.stringify({
           target_lat: coords.latitude,
           target_lon: coords.longitude,
-          // altitude_m is optional; omit or set null
+          altitude_m: altitude // Use global altitude state
         }),
       });
       if (!res.ok) {
@@ -87,11 +90,41 @@ export function ShoppingCart({ items, onIncrement, onDecrement }: ShoppingCartPr
 
     // 3) Switch to DeliveryAnimation screen
     setCheckoutStep("delivery");
+  };
 
-    // // 4) Optionally auto-complete after 30s (your existing behavior)
-    // setTimeout(() => {
-    //   setCheckoutStep("completed");
-    // }, 30000);
+  // Dummy function for testing
+  const handleTestDrone = async () => {
+    setOrderError(null);
+    
+    // Hardcoded test coordinates with global altitude
+    const testCoords = {
+      target_lat: 47.395897,
+      target_lon: 8.547884,
+      altitude_m: altitude // Use global altitude state
+    };
+
+    try {
+      console.log('🧪 Testing with dummy coordinates:', testCoords);
+      
+      const res = await fetch("https://famous-eternal-pipefish.ngrok-free.app/trigger", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(testCoords),
+      });
+      
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Trigger failed: ${res.status} ${text}`);
+      }
+
+      const result = await res.json();
+      console.log('✅ Test mission accepted:', result);
+      
+      setCheckoutStep("delivery");
+      
+    } catch (err: any) {
+      setOrderError(err?.message || "Failed to trigger test mission.");
+    }
   };
 
   if (checkoutStep === "delivery") {
@@ -122,54 +155,62 @@ export function ShoppingCart({ items, onIncrement, onDecrement }: ShoppingCartPr
       </div>
     );
   }
-  // Dummy function for testing
-  const handleTestDrone = async () => {
-    setOrderError(null);
-    
-    // Hardcoded test coordinates
-    const testCoords = {
-      target_lat: 47.395897,  // Change these to your preferred test location
-      target_lon: 8.547884,
-      // altitude_m: 50       // Optional
-    };
-
-    try {
-      console.log('🧪 Testing with dummy coordinates:', testCoords);
-      
-      const res = await fetch("https://famous-eternal-pipefish.ngrok-free.app/trigger", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(testCoords),
-      });
-      
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`Trigger failed: ${res.status} ${text}`);
-      }
-
-      const result = await res.json();
-      console.log('✅ Test mission accepted:', result);
-      
-      // Switch to delivery animation
-      setCheckoutStep("delivery");
-      
-
-      
-    } catch (err: any) {
-      setOrderError(err?.message || "Failed to trigger test mission.");
-    }
-  };
-
-
 
   return (
     <div className="py-4">
       <h2 className="text-xl font-bold mb-4">Your Cart</h2>
+      
       {orderError && (
         <div className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded p-2">
           {orderError}
         </div>
       )}
+
+      {/* NEW: Altitude Control Section */}
+      <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-blue-800">🚁 Flight Altitude</h3>
+          <span className="text-lg font-bold text-blue-600">{altitude}m</span>
+        </div>
+        
+        <div className="space-y-2">
+          <input
+            type="range"
+            min="10"
+            max="100"
+            step="5"
+            value={altitude}
+            onChange={(e) => setAltitude(Number(e.target.value))}
+            className="w-full h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer slider"
+            style={{
+              background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((altitude - 10) / 90) * 100}%, #dbeafe ${((altitude - 10) / 90) * 100}%, #dbeafe 100%)`
+            }}
+          />
+          
+          <div className="flex justify-between text-xs text-blue-600">
+            <span>10m</span>
+            <span className="font-medium">Above Home Ground</span>
+            <span>100m</span>
+          </div>
+          
+          {/* Quick preset buttons */}
+          <div className="flex gap-2 mt-2">
+            {[20, 30, 50, 80].map((preset) => (
+              <button
+                key={preset}
+                onClick={() => setAltitude(preset)}
+                className={`px-2 py-1 text-xs rounded transition-colors ${
+                  altitude === preset
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                }`}
+              >
+                {preset}m
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
 
       {/* Test button for development */}
       <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
@@ -180,9 +221,10 @@ export function ShoppingCart({ items, onIncrement, onDecrement }: ShoppingCartPr
           onClick={handleTestDrone}
           className="w-full border-yellow-300 text-yellow-700 hover:bg-yellow-100"
         >
-          Test Drone with Dummy Coordinates
+          Test Drone at {altitude}m Altitude
         </Button>
       </div>
+
       {items.length === 0 ? (
         <div className="text-center py-10">
           <p className="text-gray-500">Your cart is empty</p>
@@ -236,12 +278,17 @@ export function ShoppingCart({ items, onIncrement, onDecrement }: ShoppingCartPr
               <span>Total</span>
               <span>₹{(totalPrice + deliveryFee).toFixed(2)}</span>
             </div>
-            <Button className="w-full" size="lg" onClick={() => { handleCheckout() }} disabled={items.length === 0}>
-              Place Order
+            <Button 
+              className="w-full" 
+              size="lg" 
+              onClick={handleCheckout} 
+              disabled={items.length === 0}
+            >
+              Place Order (Flight at {altitude}m)
             </Button>
           </div>
         </>
       )}
     </div>
-  )
+  );
 }

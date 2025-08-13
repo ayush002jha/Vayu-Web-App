@@ -81,8 +81,16 @@ async def telemetry_ws(ws: WebSocket):
         logger.info(f"WebSocket client {client_id} removed from telemetry_clients")
 
 async def fly_to_location(target_lat: float, target_lon: float, altitude_m: Optional[float]):
+    """
+    Enhanced flight function with altitude-first approach:
+    1. Takeoff
+    2. Wait until target altitude is reached
+    3. Then navigate to target location at that altitude
+    4. Hover and RTL
+    """
     async with flight_lock:
         logger.info(f"Starting flight to {target_lat}, {target_lon}")
+        logger.info(f"Requested altitude: {altitude_m}m {'(above home ground)' if altitude_m else '(current altitude)'}")
         
         # Wait for GPS/home
         async for health in drone.telemetry.health():
@@ -90,39 +98,123 @@ async def fly_to_location(target_lat: float, target_lon: float, altitude_m: Opti
                 logger.info("GPS and home position ready")
                 break
 
-        # Get current absolute altitude if not provided
-        async for pos in drone.telemetry.position():
-            current_abs_alt = pos.absolute_altitude_m
-            logger.info(f"Current position: {pos.latitude_deg}, {pos.longitude_deg}, {current_abs_alt}m")
+        # Get home position absolute altitude
+        async for terrain_info in drone.telemetry.home():
+            home_absolute_altitude = terrain_info.absolute_altitude_m
+            logger.info(f"Home ground level: {home_absolute_altitude:.1f}m AMSL")
             break
             
-        target_abs_alt = altitude_m if altitude_m is not None else current_abs_alt
-        logger.info(f"Target altitude: {target_abs_alt}m")
+        # Calculate target absolute altitude
+        if altitude_m is not None:
+            target_abs_alt = home_absolute_altitude + altitude_m
+            logger.info(f"✅ Target altitude: {altitude_m}m above home ground")
+            logger.info(f"✅ Target absolute altitude: {target_abs_alt:.1f}m AMSL")
+        else:
+            # Get current altitude if none provided
+            async for pos in drone.telemetry.position():
+                target_abs_alt = pos.absolute_altitude_m
+                break
+            logger.info(f"✅ Using current altitude: {target_abs_alt:.1f}m AMSL")
+
+        # Safety check
+        min_safe_altitude = home_absolute_altitude + 5
+        if target_abs_alt < min_safe_altitude:
+            logger.warning(f"⚠️ Target altitude too low, using {min_safe_altitude:.1f}m")
+            target_abs_alt = min_safe_altitude
 
         # Arm + takeoff
-        logger.info("Arming and taking off...")
+        logger.info("🚁 Arming and taking off...")
         await drone.action.arm()
         await drone.action.takeoff()
-        await asyncio.sleep(3)
+        
+        # NEW: Wait until drone reaches target altitude BEFORE going to target location
+        logger.info(f"⬆️ Climbing to target altitude: {target_abs_alt:.1f}m AMSL...")
+        
+        # If target altitude is different from default takeoff altitude, command it
+        current_lat, current_lon = None, None
+        async for pos in drone.telemetry.position():
+            current_lat = pos.latitude_deg
+            current_lon = pos.longitude_deg
+            current_alt = pos.absolute_altitude_m
+            logger.info(f"Current position after takeoff: {current_alt:.1f}m AMSL")
+            break
+        
+        # Command drone to target altitude at current location
+        if abs(current_alt - target_abs_alt) > 2:  # Only if more than 2m difference
+            logger.info(f"🎯 Adjusting altitude from {current_alt:.1f}m to {target_abs_alt:.1f}m at current location")
+            await drone.action.goto_location(current_lat, current_lon, target_abs_alt, 0)
+        
+        # Wait until target altitude is reached
+        logger.info("⏳ Waiting to reach target altitude before proceeding to target location...")
+        altitude_reached = False
+        while not altitude_reached:
+            async for pos in drone.telemetry.position():
+                current_alt = pos.absolute_altitude_m
+                altitude_diff = abs(current_alt - target_abs_alt)
+                
+                if altitude_diff < 1.0:  # Within 1m of target altitude
+                    logger.info(f"✅ Target altitude reached: {current_alt:.1f}m AMSL (±{altitude_diff:.1f}m)")
+                    altitude_reached = True
+                    break
+                else:
+                    logger.info(f"🔄 Climbing... Current: {current_alt:.1f}m, Target: {target_abs_alt:.1f}m (diff: {altitude_diff:.1f}m)")
+                    await asyncio.sleep(1)  # Check every second
+                break
 
-        # Go to target
-        logger.info(f"Flying to target: {target_lat}, {target_lon}, {target_abs_alt}m")
+        # NOW navigate to target location at the established altitude
+        logger.info(f"➡️ Proceeding to target location at {target_abs_alt:.1f}m altitude")
+        logger.info(f"🎯 Flying to target: {target_lat:.6f}, {target_lon:.6f}")
         await drone.action.goto_location(target_lat, target_lon, target_abs_alt, 0)
 
-        # Wait until close to target
+        # Wait until close to target (horizontal distance)
+        logger.info("📍 Monitoring approach to target location...")
         async for pos in drone.telemetry.position():
             dlat = (pos.latitude_deg - target_lat)
             dlon = (pos.longitude_deg - target_lon)
             approx_m = ((dlat * 111_320)**2 + (dlon * 100_000)**2) ** 0.5
             
-            if approx_m < 5:  # within 5m
-                logger.info(f"Reached target (within {approx_m:.1f}m)")
+            if approx_m < 5:
+                logger.info(f"✅ Reached target location (within {approx_m:.1f}m)")
                 break
 
-        # Land
-        logger.info("Landing...")
-        await drone.action.land()
-        logger.info("Flight complete")
+        # Hover at 1m above home ground level
+        logger.info("⬇️ Descending to hover altitude...")
+        hover_altitude = home_absolute_altitude + 1.0
+        logger.info(f"🎯 Hover altitude: {hover_altitude:.1f}m AMSL (1m above home ground)")
+
+        await drone.action.goto_location(target_lat, target_lon, hover_altitude, 0)
+        
+        # Wait for hover altitude
+        logger.info("⏳ Waiting to reach hover altitude...")
+        async for pos in drone.telemetry.position():
+            current_height_above_home = pos.absolute_altitude_m - home_absolute_altitude
+            if abs(current_height_above_home - 1.0) < 0.5:
+                logger.info(f"✅ At hover altitude: {current_height_above_home:.1f}m above home")
+                break
+        
+        # Hover for 3 seconds
+        logger.info("⏰ Hovering for 3 seconds...")
+        await asyncio.sleep(3)
+        
+        # Return to launch
+        logger.info("🏠 Returning to launch position...")
+        await drone.action.return_to_launch()
+        
+        # Monitor RTL progress
+        logger.info("📡 Monitoring RTL progress...")
+        rtl_timeout = 0
+        async for flight_mode in drone.telemetry.flight_mode():
+            logger.info(f"Flight mode: {flight_mode}")
+            rtl_timeout += 1
+            
+            if flight_mode == "LAND" or rtl_timeout > 100:
+                logger.info("✅ RTL completed, drone landing at home position")
+                break
+            
+            await asyncio.sleep(1)
+        
+        logger.info("🎉 Flight sequence complete!")
+
 
 @app.post("/trigger")
 async def trigger_drone(req: TriggerRequest, background_tasks: BackgroundTasks):
