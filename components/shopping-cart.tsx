@@ -212,25 +212,7 @@ export function ShoppingCart({
 
   if (checkoutStep === "delivery") {
     return (
-      <div className="py-4">
-        {/* NEW: Delivery status header with RTL monitoring */}
-        <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-semibold text-green-800">
-              🚁 Delivery Status
-            </h3>
-            <div className="flex items-center gap-2">
-              <div
-                className={`w-2 h-2 rounded-full ${
-                  wsRef.current ? "bg-green-500" : "bg-red-500"
-                } animate-pulse`}
-              ></div>
-              <span className="text-xs text-green-600">Live Tracking</span>
-            </div>
-          </div>
-          <p className="text-sm text-green-700 font-medium">{deliveryStatus}</p>
-        </div>
-
+      <div className="py-4">  
         <Suspense fallback={<p>Loading map...</p>}>
           <DynamicDeliveryAnimation />
         </Suspense>
