@@ -91,6 +91,7 @@ export function ShoppingCart({
       console.log(`✅ Servo ${action} successful:`, result);
 
       // Status will be updated via WebSocket telemetry
+      setServoStatus(result.servo_status);
     } catch (error: any) {
       console.error(`❌ Servo ${action} failed:`, error);
       setOrderError(`Failed to ${action} servo: ${error.message}`);
