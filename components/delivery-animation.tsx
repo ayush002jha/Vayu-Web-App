@@ -74,18 +74,17 @@ export function DeliveryAnimation(): React.ReactElement {
   const [totalDistance, setTotalDistance] = useState<number>(0);
 
   useEffect(() => {
-    // FOR TESTING: Use hardcoded coordinates instead of geolocation
-    setStatusText("Using test location...");
+    // // FOR TESTING: Use hardcoded coordinates instead of geolocation
+    // setStatusText("Using test location...");
 
-    // Replace these with your desired test coordinates
-    const testLat = 47.396831;
-    const testLng = 8.546584;
+    // // Replace these with your desired test coordinates
+    // const testLat = 47.396831;
+    // const testLng = 8.546584;
 
-    const latlng = L.latLng(testLat, testLng);
-    setCurrentUserLocation(latlng);
-    setStatusText("Getting drone location...");
+    // const latlng = L.latLng(testLat, testLng);
+    // setCurrentUserLocation(latlng);
+    // setStatusText("Getting drone location...");
 
-    /* 
   // ORIGINAL GEOLOCATION CODE (commented out for testing)
   if (!navigator.geolocation) {
     setLocationError("Geolocation is not supported by your browser.");
@@ -106,7 +105,6 @@ export function DeliveryAnimation(): React.ReactElement {
     },
     { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
   );
-  */
   }, []);
 
   // Get drone's initial location and start telemetry

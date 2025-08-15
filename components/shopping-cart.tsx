@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import dynamic from "next/dynamic";
 import { Suspense } from "react";
 import Image from "next/image";
-import { Trash2, Minus, Plus } from "lucide-react";
+import { Trash2, Minus, Plus, Package, PackageOpen } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
 const DynamicDeliveryAnimation = dynamic(
@@ -51,7 +51,12 @@ export function ShoppingCart({
   // Global altitude state
   const [altitude, setAltitude] = useState<number>(50);
 
-  // NEW: WebSocket telemetry subscription for RTL detection
+  // NEW: Servo control state
+  const [servoStatus, setServoStatus] = useState<string>("closed");
+  const [servoLoading, setServoLoading] = useState<boolean>(false);
+  const [packageDropped, setPackageDropped] = useState<boolean>(false);
+
+  // WebSocket telemetry subscription for RTL detection
   const wsRef = useRef<WebSocket | null>(null);
   const [deliveryStatus, setDeliveryStatus] = useState<string>("Preparing...");
 
@@ -61,7 +66,40 @@ export function ShoppingCart({
   );
   const deliveryFee = 49.99;
 
-  // NEW: WebSocket telemetry listener for RTL completion
+  // NEW: Servo control function
+  const handleServoControl = async (action: "open" | "close") => {
+    setServoLoading(true);
+    setOrderError(null);
+
+    try {
+      const response = await fetch(
+        "https://famous-eternal-pipefish.ngrok-free.app/servo/control",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ action }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Servo control failed: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log(`✅ Servo ${action} successful:`, result);
+
+      // Status will be updated via WebSocket telemetry
+    } catch (error: any) {
+      console.error(`❌ Servo ${action} failed:`, error);
+      setOrderError(`Failed to ${action} servo: ${error.message}`);
+    } finally {
+      setServoLoading(false);
+    }
+  };
+
+  // WebSocket telemetry listener for RTL completion and servo status
   useEffect(() => {
     if (checkoutStep !== "delivery") {
       // Clean up WebSocket when not in delivery mode
@@ -73,9 +111,7 @@ export function ShoppingCart({
     }
 
     // Subscribe to telemetry when in delivery mode
-    const ws = new WebSocket(
-      "wss://famous-eternal-pipefish.ngrok-free.app/ws/telemetry"
-    );
+    const ws = new WebSocket("wss://famous-eternal-pipefish.ngrok-free.app/ws/telemetry");
     wsRef.current = ws;
 
     ws.onopen = () => {
@@ -86,16 +122,33 @@ export function ShoppingCart({
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+
+        // Update servo status from telemetry
+        if (data.servo_status) {
+          setServoStatus(data.servo_status.status);
+          setPackageDropped(data.servo_status.package_dropped);
+        }
+
         // Check for RTL status in telemetry
         if (data.rtl_status) {
-          if (data.rtl_status.is_rtl_active) {
-            setDeliveryStatus("🏠 Drone returning to launch...");
-            console.log("🔄 ShoppingCart: RTL triggered, drone returning home");
+          if (data.rtl_status.rtl_completed) {
+            // Only complete when RTL is actually done
             setDeliveryStatus("✅ Delivery completed!");
-            setCheckoutStep("completed");
+            console.log("🎉 ShoppingCart: RTL completed, delivery finished");
+
+            setTimeout(() => {
+              setCheckoutStep("completed");
+            }, 2000);
+          } else if (data.rtl_status.is_rtl_active) {
+            // RTL in progress
+            setDeliveryStatus("🏠 Drone returning to launch...");
+            console.log("🔄 ShoppingCart: RTL active, drone returning home");
+          } else {
+            // Mission ongoing
+            setDeliveryStatus("Mission in progress...");
           }
         } else {
-          // Update general delivery status from drone position/progress
+          // No RTL status yet = early mission phase
           setDeliveryStatus("Mission in progress...");
         }
       } catch (e) {
@@ -119,7 +172,7 @@ export function ShoppingCart({
         wsRef.current = null;
       }
     };
-  }, [checkoutStep]); // Re-run when checkout step changes
+  }, [checkoutStep]);
 
   const handleCheckout = async () => {
     setOrderError(null);
@@ -148,18 +201,15 @@ export function ShoppingCart({
 
     // 2) Send correct JSON to FastAPI with global altitude
     try {
-      const res = await fetch(
-        "https://famous-eternal-pipefish.ngrok-free.app/trigger",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            target_lat: coords.latitude,
-            target_lon: coords.longitude,
-            altitude_m: altitude, // Use global altitude state
-          }),
-        }
-      );
+      const res = await fetch("https://famous-eternal-pipefish.ngrok-free.app/trigger", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          target_lat: coords.latitude,
+          target_lon: coords.longitude,
+          altitude_m: altitude, // Use global altitude state
+        }),
+      });
       if (!res.ok) {
         const text = await res.text();
         throw new Error(`Trigger failed: ${res.status} ${text}`);
@@ -173,46 +223,140 @@ export function ShoppingCart({
     setCheckoutStep("delivery");
   };
 
-  // Dummy function for testing
-  const handleTestDrone = async () => {
-    setOrderError(null);
+  // // Dummy function for testing
+  // const handleTestDrone = async () => {
+  //   setOrderError(null);
 
-    // Hardcoded test coordinates with global altitude
-    const testCoords = {
-      target_lat: 47.396831,
-      target_lon: 8.546584,
-      altitude_m: altitude, // Use global altitude state
-    };
+  //   // Hardcoded test coordinates with global altitude
+  //   const testCoords = {
+  //     target_lat: 47.396831,
+  //     target_lon: 8.546584,
+  //     altitude_m: altitude, // Use global altitude state
+  //   };
 
-    try {
-      console.log("🧪 Testing with dummy coordinates:", testCoords);
+  //   try {
+  //     console.log("🧪 Testing with dummy coordinates:", testCoords);
 
-      const res = await fetch(
-        "https://famous-eternal-pipefish.ngrok-free.app/trigger",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(testCoords),
-        }
-      );
+  //     const res = await fetch("https://famous-eternal-pipefish.ngrok-free.app/trigger", {
+  //       method: "POST",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify(testCoords),
+  //     });
 
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`Trigger failed: ${res.status} ${text}`);
-      }
+  //     if (!res.ok) {
+  //       const text = await res.text();
+  //       throw new Error(`Trigger failed: ${res.status} ${text}`);
+  //     }
 
-      const result = await res.json();
-      console.log("✅ Test mission accepted:", result);
+  //     const result = await res.json();
+  //     console.log("✅ Test mission accepted:", result);
 
-      setCheckoutStep("delivery");
-    } catch (err: any) {
-      setOrderError(err?.message || "Failed to trigger test mission.");
-    }
-  };
+  //     setCheckoutStep("delivery");
+  //   } catch (err: any) {
+  //     setOrderError(err?.message || "Failed to trigger test mission.");
+  //   }
+  // };
 
   if (checkoutStep === "delivery") {
     return (
-      <div className="py-4">  
+      <div className="py-4">
+        {/* Delivery status header with RTL monitoring */}
+        <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-semibold text-green-800">
+              🚁 Delivery Status
+            </h3>
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-2 h-2 rounded-full ${
+                  wsRef.current ? "bg-green-500" : "bg-red-500"
+                } animate-pulse`}
+              ></div>
+              <span className="text-xs text-green-600">Live Tracking</span>
+            </div>
+          </div>
+          <p className="text-sm text-green-700 font-medium">{deliveryStatus}</p>
+
+          {/* Package drop status */}
+          {packageDropped && (
+            <div className="mt-2 p-2 bg-orange-100 border border-orange-200 rounded">
+              <p className="text-xs text-orange-700 font-medium">
+                📦 Package dropped at destination
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* NEW: Always visible servo controls during delivery */}
+        <div className="mb-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-orange-800">
+              📦 Package Control
+            </h3>
+            <span
+              className={`text-xs px-2 py-1 rounded ${
+                servoStatus === "open"
+                  ? "bg-green-100 text-green-700"
+                  : servoStatus === "closed"
+                  ? "bg-blue-100 text-blue-700"
+                  : servoStatus === "opening" || servoStatus === "closing"
+                  ? "bg-yellow-100 text-yellow-700"
+                  : "bg-red-100 text-red-700"
+              }`}
+            >
+              {servoStatus === "open"
+                ? "🟢 Open"
+                : servoStatus === "closed"
+                ? "🔵 Closed"
+                : servoStatus === "opening"
+                ? "🟡 Opening..."
+                : servoStatus === "closing"
+                ? "🟡 Closing..."
+                : "🔴 Error"}
+            </span>
+          </div>
+
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleServoControl("open")}
+              disabled={
+                servoLoading ||
+                servoStatus === "open" ||
+                servoStatus === "opening"
+              }
+              className="flex-1 border-green-300 text-green-700 hover:bg-green-50"
+            >
+              {servoStatus === "opening" ? (
+                <span className="animate-spin">⏳</span>
+              ) : (
+                <PackageOpen className="w-4 h-4 mr-1" />
+              )}
+              Open
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleServoControl("close")}
+              disabled={
+                servoLoading ||
+                servoStatus === "closed" ||
+                servoStatus === "closing"
+              }
+              className="flex-1 border-blue-300 text-blue-700 hover:bg-blue-50"
+            >
+              {servoStatus === "closing" ? (
+                <span className="animate-spin">⏳</span>
+              ) : (
+                <Package className="w-4 h-4 mr-1" />
+              )}
+              Close
+            </Button>
+          </div>
+        </div>
+
         <Suspense fallback={<p>Loading map...</p>}>
           <DynamicDeliveryAnimation />
         </Suspense>
@@ -243,11 +387,13 @@ export function ShoppingCart({
         <p className="text-gray-500 mb-6">
           Your drone has successfully completed the delivery mission and
           returned home.
+          {packageDropped && " Package was dropped at the destination."}
         </p>
         <Button
           onClick={() => {
             setCheckoutStep("cart");
             setDeliveryStatus("Preparing...");
+            setPackageDropped(false);
           }}
         >
           Place New Order
@@ -265,6 +411,81 @@ export function ShoppingCart({
           {orderError}
         </div>
       )}
+
+      {/* NEW: Always visible servo control section */}
+      <div className="mb-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-orange-800">
+            📦 Package Control
+          </h3>
+          <span
+            className={`text-xs px-2 py-1 rounded ${
+              servoStatus === "open"
+                ? "bg-green-100 text-green-700"
+                : servoStatus === "closed"
+                ? "bg-blue-100 text-blue-700"
+                : servoStatus === "opening" || servoStatus === "closing"
+                ? "bg-yellow-100 text-yellow-700"
+                : "bg-red-100 text-red-700"
+            }`}
+          >
+            {servoStatus === "open"
+              ? "🟢 Open"
+              : servoStatus === "closed"
+              ? "🔵 Closed"
+              : servoStatus === "opening"
+              ? "🟡 Opening..."
+              : servoStatus === "closing"
+              ? "🟡 Closing..."
+              : "🔴 Error"}
+          </span>
+        </div>
+
+        <p className="text-xs text-orange-600 mb-3">
+          Open the package compartment to attach your items, then close it
+          before flight.
+        </p>
+
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleServoControl("open")}
+            disabled={
+              servoLoading ||
+              servoStatus === "open" ||
+              servoStatus === "opening"
+            }
+            className="flex-1 border-green-300 text-green-700 hover:bg-green-50"
+          >
+            {servoStatus === "opening" ? (
+              <span className="animate-spin">⏳</span>
+            ) : (
+              <PackageOpen className="w-4 h-4 mr-1" />
+            )}
+            Open
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleServoControl("close")}
+            disabled={
+              servoLoading ||
+              servoStatus === "closed" ||
+              servoStatus === "closing"
+            }
+            className="flex-1 border-blue-300 text-blue-700 hover:bg-blue-50"
+          >
+            {servoStatus === "closing" ? (
+              <span className="animate-spin">⏳</span>
+            ) : (
+              <Package className="w-4 h-4 mr-1" />
+            )}
+            Close
+          </Button>
+        </div>
+      </div>
 
       {/* Altitude Control Section */}
       <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
@@ -317,7 +538,7 @@ export function ShoppingCart({
       </div>
 
       {/* Test button for development */}
-      <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
+      {/* <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
         <p className="text-sm text-yellow-800 mb-2">🧪 Testing Mode</p>
         <Button
           variant="outline"
@@ -327,7 +548,7 @@ export function ShoppingCart({
         >
           Test Drone at {altitude}m Altitude
         </Button>
-      </div>
+      </div> */}
 
       {items.length === 0 ? (
         <div className="text-center py-10">
@@ -335,6 +556,7 @@ export function ShoppingCart({
         </div>
       ) : (
         <>
+          {/* Cart items */}
           <div className="space-y-4">
             {items.map((item) => (
               <div
@@ -377,7 +599,7 @@ export function ShoppingCart({
                     className="h-8 w-8 hover:bg-primary/10 hover:text-primary"
                     onClick={() => onIncrement(item.id)}
                   >
-                    <Plus className="h-4 w-4" />
+                    <Plus className="w-4 h-4" />
                   </Button>
                 </div>
               </div>
