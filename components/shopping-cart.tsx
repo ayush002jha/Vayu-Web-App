@@ -111,7 +111,9 @@ export function ShoppingCart({
     }
 
     // Subscribe to telemetry when in delivery mode
-    const ws = new WebSocket("wss://famous-eternal-pipefish.ngrok-free.app/ws/telemetry");
+    const ws = new WebSocket(
+      "wss://famous-eternal-pipefish.ngrok-free.app/ws/telemetry"
+    );
     wsRef.current = ws;
 
     ws.onopen = () => {
@@ -122,6 +124,14 @@ export function ShoppingCart({
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+
+        // NEW: Handle immediate servo updates
+        if (data.type === "servo_update" && data.servo_status) {
+          console.log("🔧 Servo status update:", data.servo_status);
+          setServoStatus(data.servo_status.status);
+          setPackageDropped(data.servo_status.package_dropped);
+          return;
+        }
 
         // Update servo status from telemetry
         if (data.servo_status) {
@@ -201,15 +211,18 @@ export function ShoppingCart({
 
     // 2) Send correct JSON to FastAPI with global altitude
     try {
-      const res = await fetch("https://famous-eternal-pipefish.ngrok-free.app/trigger", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          target_lat: coords.latitude,
-          target_lon: coords.longitude,
-          altitude_m: altitude, // Use global altitude state
-        }),
-      });
+      const res = await fetch(
+        "https://famous-eternal-pipefish.ngrok-free.app/trigger",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            target_lat: coords.latitude,
+            target_lon: coords.longitude,
+            altitude_m: altitude, // Use global altitude state
+          }),
+        }
+      );
       if (!res.ok) {
         const text = await res.text();
         throw new Error(`Trigger failed: ${res.status} ${text}`);

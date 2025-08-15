@@ -54,8 +54,9 @@ class TriggerRequest(BaseModel):
     target_lon: float = Field(..., ge=-180, le=180)
     altitude_m: Optional[float] = Field(None, gt=0)
 
+# FIXED: Changed regex to pattern for Pydantic V2 compatibility
 class ServoRequest(BaseModel):
-    action: str = Field(..., regex="^(open|close)$")
+    action: str = Field(..., pattern="^(open|close)$")
 
 def initialize_servo():
     """Initialize servo GPIO"""
@@ -79,35 +80,76 @@ def initialize_servo():
         mission_status["servo_status"] = "error"
         return False
 
+# Add this function to your prod_server.py
+async def broadcast_servo_status():
+    """Immediately broadcast servo status to all connected clients"""
+    if not telemetry_clients:
+        return
+    
+    msg = {
+        "type": "servo_update",
+        "servo_status": {
+            "status": mission_status["servo_status"],
+            "package_dropped": mission_status["package_dropped"]
+        }
+    }
+    
+    logger.info(f"📡 Broadcasting servo status: {mission_status['servo_status']}")
+    
+    # Send to all connected WebSocket clients
+    disconnected_clients = set()
+    for client in telemetry_clients:
+        try:
+            await client.send_json(msg)
+        except Exception as e:
+            logger.warning(f"Failed to send servo update: {e}")
+            disconnected_clients.add(client)
+    
+    # Remove disconnected clients
+    for client in disconnected_clients:
+        telemetry_clients.discard(client)
+
+# Update your existing control_servo function
 async def control_servo(action: str):
     """Control servo open/close with status updates"""
     if not GPIO_AVAILABLE or servo_pwm is None:
         logger.warning("Servo control not available")
         mission_status["servo_status"] = "error"
+        await broadcast_servo_status()  # NEW: Broadcast immediately
         return False
     
     try:
         if action == "open":
             logger.info("📦 Opening servo...")
             mission_status["servo_status"] = "opening"
-            servo_pwm.ChangeDutyCycle(pwm_duty_cycle(2000))  # 2.0ms pulse for open
-            await asyncio.sleep(1)  # Wait for servo to move
+            await broadcast_servo_status()  # NEW: Broadcast opening
+            
+            servo_pwm.ChangeDutyCycle(pwm_duty_cycle(2000))
+            await asyncio.sleep(1)
+            
             mission_status["servo_status"] = "open"
+            await broadcast_servo_status()  # NEW: Broadcast open
             logger.info("✅ Servo opened")
             
         elif action == "close":
             logger.info("🔒 Closing servo...")
             mission_status["servo_status"] = "closing"
-            servo_pwm.ChangeDutyCycle(pwm_duty_cycle(1000))  # 1.0ms pulse for close
-            await asyncio.sleep(1)  # Wait for servo to move
+            await broadcast_servo_status()  # NEW: Broadcast closing
+            
+            servo_pwm.ChangeDutyCycle(pwm_duty_cycle(1000))
+            await asyncio.sleep(1)
+            
             mission_status["servo_status"] = "closed"
+            await broadcast_servo_status()  # NEW: Broadcast closed
             logger.info("✅ Servo closed")
             
         return True
     except Exception as e:
         logger.error(f"❌ Servo control error: {e}")
         mission_status["servo_status"] = "error"
+        await broadcast_servo_status()  # NEW: Broadcast error
         return False
+
 
 @app.on_event("startup")
 async def startup_event():
@@ -184,6 +226,7 @@ async def telemetry_ws(ws: WebSocket):
     finally:
         telemetry_clients.discard(ws)
         logger.info(f"WebSocket client {client_id} removed from telemetry_clients")
+
 
 # NEW: Servo control endpoints
 @app.post("/servo/control")
@@ -344,7 +387,7 @@ async def fly_to_location(target_lat: float, target_lon: float, altitude_m: Opti
         logger.info("📦 PACKAGE DROP - Opening servo for delivery...")
         if mission_status["servo_status"] == "closed":
             await control_servo("open")
-            await asyncio.sleep(3)  # Wait for package to drop
+            await asyncio.sleep(2)  # Wait for package to drop
             await control_servo("close")
             mission_status["package_dropped"] = True
             logger.info("✅ Package dropped and servo closed")
